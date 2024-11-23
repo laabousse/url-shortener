@@ -1,60 +1,74 @@
-const express = require('express');
-const bodyParser = require('body-parser');
-const dns = require('dns');
-const shortid = require('shortid');
-require('dotenv').config();
+const express = require("express");
+const bodyParser = require("body-parser");
+const dns = require("dns");
+const url = require("url");
 
 const app = express();
 
 // Middleware
 app.use(bodyParser.urlencoded({ extended: false }));
-app.use(express.json());
-app.use(express.static('public'));
+app.use(bodyParser.json());
+app.use(express.static("public"));
 
-// Store URLs
-const urlDatabase = {"1": "https://github.com/laabousse"};
+// In-memory database
+const urlDatabase = {};
+let urlCounter = 1;
 
-// Serve index.html
-app.get('/', (req, res) => {
-  res.sendFile(__dirname + '/views/index.html');
+// Home Page
+app.get("/", (req, res) => {
+  res.sendFile(__dirname + "/views/index.html");
 });
 
-// POST endpoint to shorten URL
-app.post('/api/shorturl', (req, res) => {
+// API Endpoint: Shorten URL
+app.post("/api/shorturl", (req, res) => {
   const originalUrl = req.body.url;
 
   // Validate URL format
-  const urlPattern = /^https?:\/\/([\w.-]+)/;
-  const match = originalUrl.match(urlPattern);
-  if (!match) {
-    return res.json({ error: 'invalid url' });
+  const parsedUrl = url.parse(originalUrl);
+  if (!parsedUrl.protocol || !parsedUrl.hostname) {
+    return res.json({ error: "invalid url" });
   }
 
-  const hostname = match[1];
-
-  // Check DNS lookup
-  dns.lookup(hostname, (err) => {
+  // Check if the hostname resolves
+  dns.lookup(parsedUrl.hostname, (err) => {
     if (err) {
-      return res.json({ error: 'invalid url' });
+      return res.json({ error: "invalid url" });
     }
 
-    const shortUrl = shortid.generate();
-    urlDatabase[shortUrl] = originalUrl;
+    // Check if URL is already in the database
+    const existingEntry = Object.entries(urlDatabase).find(
+      ([key, value]) => value.original_url === originalUrl
+    );
 
-    res.json({ original_url: originalUrl, short_url: shortUrl });
+    if (existingEntry) {
+      return res.json({
+        original_url: existingEntry[1].original_url,
+        short_url: parseInt(existingEntry[0]),
+      });
+    }
+
+    // Add new entry to the database
+    urlDatabase[urlCounter] = { original_url: originalUrl };
+    res.json({
+      original_url: originalUrl,
+      short_url: urlCounter,
+    });
+    urlCounter++;
   });
 });
 
-// GET endpoint to redirect to original URL
-app.get('/api/shorturl/:shortUrl', (req, res) => {
+// API Endpoint: Redirect to Original URL
+app.get("/api/shorturl/:shortUrl", (req, res) => {
   const shortUrl = req.params.shortUrl;
 
-  const originalUrl = urlDatabase[shortUrl];
-  if (!originalUrl) {
-    return res.status(404).json({ error: 'No short URL found' });
+  // Check if the short URL exists in the database
+  const entry = urlDatabase[shortUrl];
+  if (!entry) {
+    return res.status(404).json({ error: "No short URL found" });
   }
 
-  res.redirect(originalUrl);
+  // Redirect to the original URL
+  res.redirect(entry.original_url);
 });
 
 // Start the server
