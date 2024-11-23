@@ -12,7 +12,7 @@ app.use(express.static("public"));
 
 // In-memory database
 const urlDatabase = {};
-let urlCounter = 1;
+let urlCounter = 1; 
 
 // Home Page
 app.get("/", (req, res) => {
@@ -43,7 +43,7 @@ app.post("/api/shorturl", (req, res) => {
     if (existingEntry) {
       return res.json({
         original_url: existingEntry[1].original_url,
-        short_url: parseInt(existingEntry[0]),
+        short_url: parseInt(existingEntry[0]), 
       });
     }
 
@@ -53,13 +53,13 @@ app.post("/api/shorturl", (req, res) => {
       original_url: originalUrl,
       short_url: urlCounter,
     });
-    urlCounter++;
+    urlCounter++; 
   });
 });
 
 // API Endpoint: Redirect to Original URL
 app.get("/api/shorturl/:shortUrl", (req, res) => {
-  const shortUrl = req.params.shortUrl;
+  const shortUrl = parseInt(req.params.shortUrl); 
 
   // Check if the short URL exists in the database
   const entry = urlDatabase[shortUrl];
